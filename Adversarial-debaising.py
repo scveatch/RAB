@@ -123,6 +123,38 @@ import tensorflow as tf
 root = os.path.dirname(os.path.realpath('Adversarial-debaising.py'))
 
 # read in compas-scores-raw.csv from /Datasets/
-compas = pd.read_csv(root + '/Datasets/compas-scores-raw.csv')
+compas = pd.read_csv(root + '/Datasets/compas-scores-raw.csv') # recidivism data with bias in gender and race in reation to recidivism scores
 
-#
+# get col headers
+# print(compas.columns) # ['Person_ID', 'AssessmentID', 'Case_ID', 'Agency_Text', 'LastName', 'FirstName', 'MiddleName', 'Sex_Code_Text', 'Ethnic_Code_Text', 'DateOfBirth', 'ScaleSet_ID', 'ScaleSet', 'AssessmentReason', 'Language', 'LegalStatus', 'CustodyStatus', 'MaritalStatus', 'Screening_Date', 'RecSupervisionLevel', 'RecSupervisionLevelText', 'Scale_ID', 'DisplayText', 'RawScore', 'DecileScore', 'ScoreText', 'AssessmentType', 'IsCompleted', 'IsDeleted'
+
+# filter for DisplayText == 'Risk of Recidivism'
+# compas = compas[compas['DisplayText'] == 'Risk of Recidivism']
+
+# drop the columns that are not needed
+compas = compas.drop(['Person_ID', 'AssessmentID', 'Case_ID', 'Agency_Text', 'LastName', 'FirstName', 'MiddleName', 'DateOfBirth', 'ScaleSet_ID', 'ScaleSet', 'AssessmentReason', 'Language', 'LegalStatus', 'CustodyStatus', 'MaritalStatus', 'Screening_Date', 'RecSupervisionLevel', 'RecSupervisionLevelText', 'Scale_ID', 'DisplayText', 'RawScore', 'ScoreText', 'AssessmentType', 'IsCompleted', 'IsDeleted'], axis=1)
+
+# drop the rows that are not needed
+compas = compas.dropna()
+# print(compas.columns)
+# convert categorical variables to numerical, for the columns Sex_Code_Text and Ethnic_Code_Text
+from sklearn.preprocessing import LabelEncoder
+le1, le2 = LabelEncoder(), LabelEncoder()  # instantiate the encoder
+le1.fit(pd.unique(compas['Sex_Code_Text']))  # fit the encoder to the unique values in the column
+# convert the column to numerical
+compas['Sex_Code_Text'] = le1.transform(compas['Sex_Code_Text'])
+le2.fit(pd.unique(compas['Ethnic_Code_Text']))  # fit the encoder to the unique values in the column
+# convert the column to numerical
+compas['Ethnic_Code_Text'] = le2.transform(compas['Ethnic_Code_Text'])
+
+
+
+# print the first 5 rows
+# print(compas.head())
+
+
+
+
+# find the covariance and collinearity between the variables Ethic_Code_Text, Sex_Code_Text, and DecileScore for DisplayText == 'Risk of Recidivism'
+print(compas.cov())
+print(compas.corr())
