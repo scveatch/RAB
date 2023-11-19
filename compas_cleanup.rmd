@@ -1,0 +1,37 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+root_wd = getwd()
+compas = read_csv(paste0(root_wd, "/Datasets/compas-scores-raw.csv"))
+dim(compas)
+head(compas,5)
+```
+
+```{r}
+# Person_ID,AssessmentID,Case_ID,Agency_Text,LastName,FirstName,MiddleName,Sex_Code_Text,Ethnic_Code_Text,DateOfBirth,ScaleSet_ID,ScaleSet,AssessmentReason,Language,LegalStatus,CustodyStatus,MaritalStatus,Screening_Date,RecSupervisionLevel,RecSupervisionLevelText,Scale_ID,DisplayText,RawScore,DecileScore,ScoreText,AssessmentType,IsCompleted,IsDeleted
+compas = compas %>% select(Person_ID, AssessmentID, Sex_Code_Text, Ethnic_Code_Text, DateOfBirth, Screening_Date, LegalStatus, CustodyStatus, MaritalStatus, Scale_ID, DisplayText, RawScore, DecileScore, ScoreText)
+
+# creat filtered datasets for where DisplayText = Risk of Violence, Risk of Recidivism, Risk of Failure to Appear then join each dataset together on Person_ID
+compas_risk_violence = compas %>% filter(DisplayText == "Risk of Violence") %>% rename(Risk_of_Violence = DisplayText, Risk_of_Violence_Score = DecileScore, Risk_of_Violence_Text = ScoreText)
+compas_risk_recidivism = compas %>% filter(DisplayText == "Risk of Recidivism") %>% rename(Risk_of_Recidivism = DisplayText, Risk_of_Recidivism_Score = DecileScore, Risk_of_Recidivism_Text = ScoreText)
+compas_risk_failure = compas %>% filter(DisplayText == "Risk of Failure to Appear") %>% rename(Risk_of_Failure = DisplayText, Risk_of_Failure_Score = DecileScore, Risk_of_Failure_Text = ScoreText)
+
+
+compas_risk_violence_recidivism = left_join(compas_risk_violence, compas_risk_recidivism, by =c("Person_ID", "AssessmentID", "Sex_Code_Text", "Ethnic_Code_Text", "DateOfBirth", "Screening_Date", "LegalStatus", "CustodyStatus", "MaritalStatus", "Scale_ID"))
+compas_risk_violence_recidivism_failure = left_join(compas_risk_violence_recidivism, compas_risk_failure, by = c("Person_ID", "AssessmentID", "Sex_Code_Text", "Ethnic_Code_Text", "DateOfBirth", "Screening_Date", "LegalStatus", "CustodyStatus", "MaritalStatus", "Scale_ID"))
+```
+```{r}
+# save the csv
+# write_csv(compas_risk_violence_recidivism_failure, paste0(root_wd, "/Datasets/compas_risk_violence_recidivism_failure.csv"))
+dim(compas_risk_violence_recidivism_failure)
+
+```
+
+```{r}
+# see how custody status, marrige status, race, and age effect the risk of violence, recidivism, and failure to appear
+# perform a Covariance, Collinearity, and Correlation Analysis
+```
