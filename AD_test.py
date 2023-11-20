@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras import layers
+from keras import layers
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
@@ -13,8 +13,6 @@ root = os.path.dirname(os.path.realpath('Adversarial-debaising.py'))
 
 # read in compas-scores-raw.csv from /Datasets/
 compas = pd.read_csv(root + '/Datasets/compas-scores-raw.csv') # recidivism data with bias in gender and race in reation to recidivism scores
-
-
 
 # Split the data into train and test sets
 X_train, X_test, y_train, y_test = train_test_split(compas, compas['DecileScore'], test_size=0.2, random_state=0)
