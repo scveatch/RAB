@@ -8,96 +8,6 @@
 # # prevent the main model from learning from any parameters in Z in a significant way, while not removing data
 # # that may otherwise be highly correlated.
 #
-#
-#
-#
-# import tensorflow as tf
-#
-# # Define the model
-# def make_model():
-#     model = tf.keras.Sequential([
-#         tf.keras.layers.Dense(64, activation='relu', input_shape=(784,)),
-#         tf.keras.layers.Dense(64, activation='relu'),
-#         tf.keras.layers.Dense(10, activation='softmax')
-#     ])
-#     return model
-#
-# # Define the secondary model
-# def make_debiasing_model():
-#     model = tf.keras.Sequential([
-#         tf.keras.layers.Dense(64, activation='relu', input_shape=(784,)),
-#         tf.keras.layers.Dense(64, activation='relu'),
-#         tf.keras.layers.Dense(1, activation='sigmoid')
-#     ])
-#     return model
-#
-# # Define the loss function
-# def loss_fn(y_true, y_pred):
-#     return tf.keras.losses.categorical_crossentropy(y_true, y_pred) + tf.keras.losses.binary_crossentropy(y_true, y_pred)
-#
-# # Define the loss function for the secondary model
-# def debiasing_loss_fn(y_true, y_pred):
-#     return tf.keras.losses.binary_crossentropy(y_true, y_pred)
-#
-# # Define the optimizer
-# optimizer = tf.keras.optimizers.Adam(0.001)
-#
-# # Define the optimizer for the secondary model
-# debiasing_optimizer = tf.keras.optimizers.Adam(0.001)
-#
-# # Define the metrics
-# train_loss = tf.keras.metrics.Mean(name='train_loss')
-# train_accuracy = tf.keras.metrics.CategoricalAccuracy(name='train_accuracy')
-#
-# # Define the metrics for the secondary model
-# debiasing_train_loss = tf.keras.metrics.Mean(name='debiasing_train_loss')
-# debiasing_train_accuracy = tf.keras.metrics.BinaryAccuracy(name='debiasing_train_accuracy')
-#
-# # Define the training step
-# @tf.function
-# def train_step(inputs, labels, debiasing_labels):
-#     with tf.GradientTape() as tape, tf.GradientTape() as debiasing_tape:
-#         predictions = model(inputs)
-#         debiasing_predictions = debiasing_model(inputs)
-#
-#         loss = loss_fn(labels, predictions)
-#         debiasing_loss = debiasing_loss_fn(debiasing_labels, debiasing_predictions)
-#
-#     gradients = tape.gradient(loss, model.trainable_variables)
-#     debiasing_gradients = debiasing_tape.gradient(debiasing_loss, debiasing_model.trainable_variables)
-#
-#     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-#     debiasing_optimizer.apply_gradients(zip(debiasing_gradients, debiasing_model.trainable_variables))
-#
-#     train_loss(loss)
-#     train_accuracy(labels, predictions)
-#     debiasing_train_loss(debiasing_loss)
-#     debiasing_train_accuracy(debiasing_labels, debiasing_predictions)
-#
-# # Define the training loop
-# EPOCHS = 5
-#
-# for epoch in range(EPOCHS):
-#     for images, labels in train_ds:
-#         debiasing_labels = tf.random.uniform(shape=(labels.shape[0], 1), minval=0, maxval=2, dtype=tf.int32)
-#         train_step(images, labels, debiasing_labels)
-#
-#     template = 'Epoch {}, Loss: {}, Accuracy: {}, De-Biasing Loss: {}, De-Biasing Accuracy: {}'
-#     print(template.format(epoch+1,
-#                           train_loss.result(),
-#                           train_accuracy.result()*100,
-#                           debiasing_train_loss.result(),
-#                           debiasing_train_accuracy.result()*100))
-#
-#     train_loss.reset_states()
-#     train_accuracy.reset_states()
-#     debiasing_train_loss.reset_states()
-#     debiasing_train_accuracy.reset_states()
-#
-# # Evaluate the model
-# test_loss, test_accuracy = model.evaluate(test_ds)
-# print('Test Loss: {}, Test Accuracy: {}'.format(test_loss, test_accuracy*100))
-
 # Adversarial De-Biasing
 # This approach requires a fundamental change to the structure of the model, and therefore is not necessarily
 # the best approach. However, it is a valid one that I believe will likely have some positive impact. Think
@@ -156,5 +66,94 @@ compas['Ethnic_Code_Text'] = le2.transform(compas['Ethnic_Code_Text'])
 
 
 # find the covariance and collinearity between the variables Ethic_Code_Text, Sex_Code_Text, and DecileScore for DisplayText == 'Risk of Recidivism'
-print(compas.cov())
-print(compas.corr())
+# covariance measures the relationship between two variables, collinearity measures the relationship between multiple variables
+print(compas.cov()) # a high score indicates a high covariance between the variables, vice versa for a low score
+print(compas.corr()) # a high score indicates a high collinearity between the variables, vice versa for a low score
+
+# sample the data to get a balanced dataset for training
+df_train = compas.sample(frac=0.8, random_state=0)
+df_test = compas.drop(df_train.index)
+
+# split the data into features and labels
+train_features = df_train.copy()
+test_features = df_test.copy()
+train_labels = train_features.pop('DecileScore')
+test_labels = test_features.pop('DecileScore')
+
+print(train_features.head())
+print(train_labels.head())
+
+# normalize the data
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+train_features = scaler.fit_transform(train_features)
+test_features = scaler.transform(test_features)
+
+# convert the data to tensors
+train_features = tf.convert_to_tensor(train_features, dtype=tf.float32)
+test_features = tf.convert_to_tensor(test_features, dtype=tf.float32)
+train_labels = tf.convert_to_tensor(train_labels, dtype=tf.float32)
+test_labels = tf.convert_to_tensor(test_labels, dtype=tf.float32)
+
+# define the model
+def make_model():
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(64, activation='relu', input_shape=(4,)),
+        tf.keras.layers.Dense(64, activation='relu'),
+        tf.keras.layers.Dense(1)
+    ])
+    return model
+model = make_model()
+
+# define the loss function
+def loss_fn(y_true, y_pred):
+    return tf.keras.losses.MSE(y_true, y_pred)
+
+# define the optimizer
+optimizer = tf.keras.optimizers.Adam(0.001)
+
+# define the metrics
+train_loss = tf.keras.metrics.Mean(name='train_loss')
+train_accuracy = tf.keras.metrics.MeanSquaredError(name='train_accuracy')
+
+# define the training step
+@tf.function
+def train_step(inputs, labels):
+    with tf.GradientTape() as tape:
+        predictions = model(inputs)
+        loss = loss_fn(labels, predictions)
+
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+    train_loss(loss)
+    train_accuracy(labels, predictions)
+
+# define the training loop
+EPOCHS = 5
+
+for epoch in range(EPOCHS):
+    for x, y in zip(train_features, train_labels):
+        train_step(x, y)
+
+    template = 'Epoch {}, Loss: {}, Accuracy: {}'
+    print(template.format(epoch + 1,
+                          train_loss.result(),
+                          train_accuracy.result() * 100))
+
+# define the test metrics
+test_loss = tf.keras.metrics.Mean(name='test_loss')
+test_accuracy = tf.keras.metrics.MeanSquaredError(name='test_accuracy')
+
+# define the test step
+@tf.function
+def test_step(inputs, labels):
+    predictions = model(inputs)
+    t_loss = loss_fn(labels, predictions)
+
+    test_loss(t_loss)
+    test_accuracy(labels, predictions)
+
+# define the test loop
+for x, y in zip(test_features, test_labels):
+    test_step(x, y)
